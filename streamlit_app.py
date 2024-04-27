@@ -2,6 +2,7 @@ import streamlit as st
 import pdfplumber
 import pandas as pd
 from docx import Document
+from io import BytesIO
 
 def extract_text_from_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
@@ -17,8 +18,13 @@ def extract_text_from_doc(doc_path):
 
 def save_to_excel_and_csv(data, excel_path, csv_path):
     df = pd.DataFrame(data, columns=['Name', 'Email', 'Contact', 'Text'])
-    df.to_excel(excel_path, index=False)
+    # Save to Excel using BytesIO
+    excel_data = BytesIO()
+    df.to_excel(excel_data, index=False)
+    excel_data.seek(0) # Move to the beginning of the BytesIO object
+    # Save to CSV
     df.to_csv(csv_path, index=False)
+    return excel_data
 
 def process_files(files):
     data = []
@@ -31,7 +37,6 @@ def process_files(files):
             st.error(f"Unsupported file type: {file.type}. Please upload PDF or DOCX files.")
             continue
 
-        # Assuming the name is at the beginning of the text, followed by email and contact number
         text_parts = text.split('\n')
         if len(text_parts) < 3:
             st.error("Insufficient data in the file. Please ensure the CV contains a name, email, and contact number.")
@@ -52,17 +57,21 @@ if __name__ == "__main__":
         data = process_files(uploaded_files)
         if data:
             st.success("Files processed successfully.")
-            # Display the extracted data
             st.write(data)
 
             # Save the data to a file
-            excel_path = "output.xlsx"
-            csv_path = "output.csv"
-            save_to_excel_and_csv(data, excel_path, csv_path)
+            excel_path = "./output.xlsx"
+            csv_path = "./output.csv"
+            excel_data = save_to_excel_and_csv(data, excel_path, csv_path)
 
             # Provide download links
             st.markdown(f"Download the processed data as:")
-            st.markdown(f"- [Excel]({excel_path})")
-            st.markdown(f"- [CSV]({csv_path})")
+            # Use st.download_button for Excel file
+            st.download_button(
+                label="Download Excel",
+                data=excel_data,
+                file_name="output.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
         else:
             st.error("Failed to process the files. Please check the file formats and contents.")
